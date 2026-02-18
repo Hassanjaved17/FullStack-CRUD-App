@@ -19,7 +19,7 @@ const FetchUsersTable = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [users]);
 
   const filtered = users.filter(
     (u) =>
