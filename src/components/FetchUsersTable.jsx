@@ -3,7 +3,10 @@ import axios from "axios";
 
 const FetchUsersTable = () => {
   const [users, setUsers] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ username: "", message: "" });
   const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState(null);
   const [search, setSearch] = useState("");
 
   const fetchUsers = async () => {
@@ -19,13 +22,60 @@ const FetchUsersTable = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [users]);
+  }, []);
+
+  // Enter edit mode — pre-fill inputs with current values
+  const handleEdit = (user) => {
+    setEditingId(user._id);
+    setEditForm({ username: user.username, message: user.message });
+  };
+
+  // Cancel — just clear editing state
+  const handleCancel = () => {
+    setEditingId(null);
+    setEditForm({ username: "", message: "" });
+  };
+
+  // Save — PUT request then refresh
+  const handleSave = async (id) => {
+    setSavingId(id);
+    try {
+      await axios.put(`http://localhost:3000/updateuser/${id}`, editForm);
+      await fetchUsers();
+      setEditingId(null);
+    } catch (err) {
+      console.log(err);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  // Delete
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`http://localhost:3000/deleteuser/${id}`);
+      await fetchUsers();
+    } catch (err) {
+      console.log(err);
+    }
+  };
 
   const filtered = users.filter(
     (u) =>
       u.username?.toLowerCase().includes(search.toLowerCase()) ||
       u.message?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const inlineInputStyle = {
+    background: "rgba(99,102,241,0.1)",
+    border: "1px solid rgba(99,102,241,0.4)",
+    borderRadius: "8px",
+    color: "#e0e0ff",
+    padding: "4px 8px",
+    fontSize: "13px",
+    outline: "none",
+    width: "100%",
+  };
 
   return (
     <div className="min-h-screen px-4 py-16" style={{ background: "#0a0a14" }}>
@@ -50,15 +100,8 @@ const FetchUsersTable = () => {
             </p>
           </div>
 
-          {/* Search */}
           <div className="relative">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 w-4 h-4"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -67,10 +110,7 @@ const FetchUsersTable = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-4 py-2 rounded-xl text-sm text-white/80 placeholder-white/25 outline-none focus:ring-1 focus:ring-indigo-500/50 w-56 transition-all"
-              style={{
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.1)",
-              }}
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
             />
           </div>
         </div>
@@ -84,7 +124,6 @@ const FetchUsersTable = () => {
             backdropFilter: "blur(20px)",
           }}
         >
-          {/* Loading state */}
           {loading ? (
             <div className="flex items-center justify-center py-20 gap-3">
               <span className="loading loading-spinner loading-sm text-indigo-400" />
@@ -100,141 +139,157 @@ const FetchUsersTable = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                {/* Head */}
                 <thead>
-                  <tr
-                    style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
-                  >
+                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
                     {["#", "Username", "Message", "Actions"].map((h) => (
-                      <th
-                        key={h}
-                        className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-widest"
-                        style={{ color: "rgba(165,180,252,0.6)" }}
-                      >
+                      <th key={h} className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-widest" style={{ color: "rgba(165,180,252,0.6)" }}>
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
 
-                {/* Body */}
                 <tbody>
-                  {filtered.map((user, index) => (
-                    <tr
-                      key={user._id || index}
-                      className="group transition-colors duration-150"
-                      style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
-                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,0.06)")}
-                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                    >
-                      {/* Index */}
-                      <td className="px-5 py-4">
-                        <span
-                          className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
-                          style={{
-                            background: "rgba(99,102,241,0.15)",
-                            color: "#a5b4fc",
-                          }}
-                        >
-                          {index + 1}
-                        </span>
-                      </td>
+                  {filtered.map((user, index) => {
+                    const isEditing = editingId === user._id;
+                    const isSaving = savingId === user._id;
 
-                      {/* Username */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                            style={{
-                              background: `linear-gradient(135deg, hsl(${(index * 67) % 360}, 70%, 55%), hsl(${(index * 67 + 40) % 360}, 70%, 45%))`,
-                            }}
-                          >
-                            {user.username?.[0]?.toUpperCase() ?? "?"}
-                          </div>
-                          <span className="text-white/80 font-medium">
-                            {user.username}
+                    return (
+                      <tr
+                        key={user._id || index}
+                        className="transition-colors duration-150"
+                        style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,0.06)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                      >
+                        {/* Index */}
+                        <td className="px-5 py-4">
+                          <span className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold" style={{ background: "rgba(99,102,241,0.15)", color: "#a5b4fc" }}>
+                            {index + 1}
                           </span>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Message */}
-                      <td className="px-5 py-4 max-w-xs">
-                        <span className="text-white/45 truncate block">
-                          {user.message || "—"}
-                        </span>
-                      </td>
+                        {/* Username */}
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                              style={{ background: `linear-gradient(135deg, hsl(${(index * 67) % 360}, 70%, 55%), hsl(${(index * 67 + 40) % 360}, 70%, 45%))` }}
+                            >
+                              {user.username?.[0]?.toUpperCase() ?? "?"}
+                            </div>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editForm.username}
+                                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                                style={inlineInputStyle}
+                              />
+                            ) : (
+                              <span className="text-white/80 font-medium">{user.username}</span>
+                            )}
+                          </div>
+                        </td>
 
-                      {/* Actions */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
-                            style={{
-                              background: "rgba(99,102,241,0.12)",
-                              border: "1px solid rgba(99,102,241,0.25)",
-                              color: "#a5b4fc",
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.background = "rgba(99,102,241,0.25)";
-                              e.currentTarget.style.boxShadow = "0 0 16px rgba(99,102,241,0.2)";
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.background = "rgba(99,102,241,0.12)";
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Edit
-                          </button>
+                        {/* Message */}
+                        <td className="px-5 py-4 max-w-xs">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editForm.message}
+                              onChange={(e) => setEditForm({ ...editForm, message: e.target.value })}
+                              style={inlineInputStyle}
+                            />
+                          ) : (
+                            <span className="text-white/45 truncate block">{user.message || "—"}</span>
+                          )}
+                        </td>
 
-                          <button
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
-                            style={{
-                              background: "rgba(239,68,68,0.1)",
-                              border: "1px solid rgba(239,68,68,0.25)",
-                              color: "#fca5a5",
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.background = "rgba(239,68,68,0.22)";
-                              e.currentTarget.style.boxShadow = "0 0 16px rgba(239,68,68,0.15)";
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.background = "rgba(239,68,68,0.1)";
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        {/* Actions */}
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            {isEditing ? (
+                              <>
+                                {/* Save */}
+                                <button
+                                  onClick={() => handleSave(user._id)}
+                                  disabled={isSaving}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
+                                  style={{
+                                    background: "rgba(34,197,94,0.12)",
+                                    border: "1px solid rgba(34,197,94,0.3)",
+                                    color: "#86efac",
+                                    opacity: isSaving ? 0.6 : 1,
+                                    cursor: isSaving ? "not-allowed" : "pointer",
+                                  }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(34,197,94,0.22)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(34,197,94,0.15)"; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(34,197,94,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
+                                >
+                                  {isSaving
+                                    ? <span className="loading loading-spinner loading-xs" />
+                                    : <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                  }
+                                  Save
+                                </button>
+
+                                {/* Cancel */}
+                                <button
+                                  onClick={handleCancel}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
+                                  style={{
+                                    background: "rgba(255,255,255,0.06)",
+                                    border: "1px solid rgba(255,255,255,0.12)",
+                                    color: "rgba(255,255,255,0.5)",
+                                  }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.12)"; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {/* Edit */}
+                                <button
+                                  onClick={() => handleEdit(user)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
+                                  style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.25)", color: "#a5b4fc" }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,102,241,0.25)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(99,102,241,0.2)"; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(99,102,241,0.12)"; e.currentTarget.style.boxShadow = "none"; }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                  Edit
+                                </button>
+
+                                {/* Delete */}
+                                <button
+                                  onClick={() => handleDelete(user._id)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
+                                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#fca5a5" }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.22)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(239,68,68,0.15)"; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; e.currentTarget.style.boxShadow = "none"; }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Footer row */}
           {!loading && filtered.length > 0 && (
-            <div
-              className="px-5 py-3 flex items-center justify-between"
-              style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
-            >
-              <span className="text-white/25 text-xs">
-                Showing {filtered.length} of {users.length} users
-              </span>
-              <button
-                onClick={fetchUsers}
-                className="flex items-center gap-1.5 text-xs text-white/30 hover:text-indigo-300 transition-colors duration-200"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
+            <div className="px-5 py-3 flex items-center justify-between" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <span className="text-white/25 text-xs">Showing {filtered.length} of {users.length} users</span>
+              <button onClick={fetchUsers} className="flex items-center gap-1.5 text-xs text-white/30 hover:text-indigo-300 transition-colors duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 Refresh
               </button>
             </div>
